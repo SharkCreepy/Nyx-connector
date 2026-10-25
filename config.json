@@ -1,14 +1,14 @@
 {
   "mcpServers": {
     "roblox": {
-      "command": "C:/Users/herdodp/AppData/Local/Roblox/Versions/version-7aaa6838d36c4448/StudioMCP.exe",
+      "command": "StudioMCP.exe",
       "args": ["--stdio"]
     },
     "vscode": {
       "command": "vscode_mcp.exe",
       "args": [],
       "env": {
-        "VSCODE_WORKSPACE_PATH": "d:/project/snapgent"
+        "VSCODE_WORKSPACE_PATH": "."
       }
     }
   }

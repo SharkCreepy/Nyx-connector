@@ -4,6 +4,14 @@ chcp 65001 >nul
 title Nyx Bridge
 cd /d "%~dp0"
 
+echo.
+echo   Preparing local MCP server paths...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup-windows.ps1"
+if errorlevel 1 (
+    echo   WARNING: Could not update MCP paths automatically.
+    echo   The bridge will still start; check config.json if servers stay offline.
+)
+
 if not exist "%~dp0logs" mkdir "%~dp0logs" >nul 2>nul
 set "LOGFILE=%~dp0logs\start.log"
 
