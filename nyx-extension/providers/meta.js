@@ -579,6 +579,16 @@ const ZSProvider = (() => {
     } catch {}
   }
 
+  function submitForm(button) {
+    try {
+      const form = button && button.closest && button.closest("form");
+      if (!form) return false;
+      if (typeof form.requestSubmit === "function") form.requestSubmit(button);
+      else form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      return true;
+    } catch { return false; }
+  }
+
   async function typeAndSend(text, images) {
     // Images FIRST: staging swaps in the inline image; the mirror textarea still
     // drives the composed text alongside it. Idempotent across the core's up-to-4
@@ -595,6 +605,11 @@ const ZSProvider = (() => {
     const editor = writeEl();
     if (!editor) throw new Error("Meta AI input box not found");
     const usersBeforeSend = userCount();
+    const assistantsBeforeSend = assistantCount();
+    const explicitUsersBeforeSend = document.querySelectorAll(
+      '[data-testid="user-message"],[data-testid="user-message-content"]'
+    ).length;
+    const pathBeforeSend = location.pathname;
     editor.focus();
     setTextareaValue(editor, text);
     const sendReady = () => {
@@ -609,6 +624,9 @@ const ZSProvider = (() => {
     const accepted = () =>
       (editorText().trim() === "" && !hasPendingAttachment()) ||
       userCount() > usersBeforeSend ||
+      assistantCount() > assistantsBeforeSend ||
+      document.querySelectorAll('[data-testid="user-message"],[data-testid="user-message-content"]').length > explicitUsersBeforeSend ||
+      (location.pathname !== pathBeforeSend && location.pathname !== "/") ||
       !!stopButton();
     try { sendButton().click(); } catch (error) {
       throw new Error(`Meta AI send button failed: ${String(error && error.message || error)}`);
@@ -617,6 +635,14 @@ const ZSProvider = (() => {
     // current build ignores programmatic click(), retry through its pointer and
     // keyboard paths before declaring startup failed.
     let sent = await waitFor(accepted, 1800);
+    if (!sent) {
+      const button = sendButton();
+      // Current Meta builds route the composer through a form submit handler;
+      // requestSubmit reaches that handler even when HTMLElement.click() is
+      // swallowed by the React button wrapper.
+      submitForm(button);
+      sent = await waitFor(accepted, 1800);
+    }
     if (!sent) {
       pointerActivate(sendButton());
       sent = await waitFor(accepted, 1200);
@@ -630,6 +656,7 @@ const ZSProvider = (() => {
       sent,
       editorLen: editorText().length,
       newUserTurn: userCount() > usersBeforeSend,
+      newAssistantTurn: assistantCount() > assistantsBeforeSend,
       generating: !!stopButton(),
       fallback: !sent ? "none" : editorText().trim() === "" ? "clear" : stopButton() ? "stop" : "user-turn",
     });
