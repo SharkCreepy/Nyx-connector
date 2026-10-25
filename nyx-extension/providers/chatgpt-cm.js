@@ -42,8 +42,8 @@
   const LEN = "data-zs-cm-len";
 
   // Republishing a 10k-char attribute on every sample would churn the DOM (the
-  // core samples the stream ~8x/s). Only write when the document actually grew
-  // or changed length, tracked per node so a re-render starts clean.
+  // core samples the stream ~8x/s). Only write when the document text actually
+  // changed, tracked per node so a re-render starts clean.
   const seen = new WeakMap();
 
   // The view can hang off the content node directly, or off its own dom's tile.
@@ -65,13 +65,14 @@
     const doc = docOf(content);
     if (!doc) return false;
     const len = doc.length;
-    if (seen.get(content) === len && content.hasAttribute(ATTR)) return true;
     let text;
     try { text = doc.toString(); } catch { return false; }
+    const prior = seen.get(content);
+    if (prior && prior.len === len && prior.text === text && content.hasAttribute(ATTR)) return true;
     try {
       content.setAttribute(ATTR, text);
       content.setAttribute(LEN, String(len));
-      seen.set(content, len);
+      seen.set(content, { len, text });
     } catch { return false; }
     return true;
   }

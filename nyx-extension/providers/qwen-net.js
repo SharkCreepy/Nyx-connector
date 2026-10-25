@@ -80,7 +80,12 @@
         publish({ rid: acc.rid, text: acc.text, done: acc.done, t: Date.now() });
       }
       if (buf) foldLine(buf, acc);
-    } catch {}
+    } catch {
+      // A partial response is not a completed response. Mark the tap as failed
+      // so qwen.js can ignore it and fall back to the site's DOM state.
+      publish({ rid: acc.rid, text: acc.text, done: false, error: true, t: Date.now() });
+      return;
+    }
     acc.done = true;
     publish({ rid: acc.rid, text: acc.text, done: acc.done, t: Date.now() });
   }

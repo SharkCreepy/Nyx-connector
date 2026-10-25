@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // providers/qwen.js - the Qwen (chat.qwen.ai, Alibaba Cloud) provider.
-// Exports the same ZSProvider interface as providers/deepseek.js and kimi.js;
+// Exports the same ZSProvider interface as providers/kimi.js;
 // the core (core/main.js) is provider-agnostic. To DISABLE Qwen support, remove
 // this file from manifest.json (and its URL from background.js PROVIDER_URLS +
 // main.js AI_SITES).
@@ -197,7 +197,7 @@ const ZSProvider = (() => {
     if (item !== lastAssistant()) return null;
     if (latestIsDual()) return null; // A/B: text interleaved - read DOM candidate 1
     const net = netCurrent();
-    return net ? net.text : null;
+    return net && !net.error ? net.text : null;
   }
 
   // ── Turn classification ───────────────────────────────────────────────────
@@ -550,6 +550,7 @@ const ZSProvider = (() => {
   function netGenState() {
     const net = netCurrent();
     if (!net) return null; // no fresh tap -> let DOM signals decide
+    if (net.error) return null; // failed tap must not finalize partial text
     if (net.done) return "done";
     // Streaming per the tap. Guard against a tap that never received its final
     // done flag (a missed [DONE]/finished, or an uncaptured request): if the DOM
@@ -695,7 +696,13 @@ const ZSProvider = (() => {
         if (t.length > 8 && t.length < 600 && (RE.contextLimit.test(t) || RE.usageLimit.test(t))) return t.slice(0, 240);
       }
     } catch {}
-    if (!getEditor()) return "The input box disappeared (session ended?).";
+    // Qwen intentionally removes the composer while an A/B comparison is open;
+    // core/main.js must reach resolveComparison() instead of treating that as a
+    // dead session.
+    if (!getEditor()) {
+      if (isDualItem(lastAssistant())) return null;
+      return "The input box disappeared (session ended?).";
+    }
     return null;
   }
   const isTooLongMsg = (text) => RE.tooLong.test(text);

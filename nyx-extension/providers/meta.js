@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // providers/meta.js - the Meta AI (www.meta.ai) provider.
-// Exports the same ZSProvider interface as providers/deepseek.js; the core
+// Exports the same ZSProvider interface as other provider modules; the core
 // (core/main.js) is provider-agnostic. To DISABLE Meta AI support, remove this
 // file from manifest.json (and its URL from background.js PROVIDER_URLS).
 //

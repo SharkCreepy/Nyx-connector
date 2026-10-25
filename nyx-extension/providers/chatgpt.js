@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // providers/chatgpt.js - the OpenAI ChatGPT (chatgpt.com) provider.
-// Exports the same ZSProvider interface as providers/deepseek.js and
+// Exports the same ZSProvider interface as other provider modules and
 // providers/gemini.js; the core (core/main.js) is provider-agnostic. To DISABLE
 // ChatGPT support, remove this file from manifest.json (and its URL from
 // background.js PROVIDER_URLS + manifest host_permissions + popup.js
@@ -50,7 +50,7 @@
 //    far (2026-08, free tier) had no such element, so `thinkingSel` is not
 //    exported. If reasoning ever quotes a command block, the core's
 //    "raw command still visible" probe could flap - that is the symptom to watch
-//    for, and the fix is to export thinkingSel here (see deepseek.js).
+//    for, and the fix is to export thinkingSel here (see the provider-specific reasoning implementation).
 //  - New chat: <a data-testid="create-new-chat-button" href="/">. A blank new
 //    chat is exactly "/"; a conversation is /c/<id>.
 //  - ChatGPT's free tier caps messages, and caps image/file input SEPARATELY, so
@@ -384,6 +384,12 @@ const ZSProvider = (() => {
     return item ? textWithout(item, ".zs-chip") : "";
   }
   const streamLen = (item) => streamText(item === undefined ? lastAssistant() : item).length;
+  // Reasoning renders outside .markdown, so it must have its own activity clock.
+  // Otherwise a long thinking phase can look idle even while ChatGPT's stop
+  // button is still present.
+  function reasoningText(item) {
+    return item ? textWithout(item, `${S.reply}, .zs-chip`) : "";
+  }
 
   let _streamMax = -1, _streamAt = 0, _streamItem = null;
   function sampleStream() {
@@ -397,17 +403,31 @@ const ZSProvider = (() => {
   }
   const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
 
+  let _reasonMax = -1, _reasonAt = 0, _reasonItem = null;
+  function sampleReasoning() {
+    const item = lastAssistant();
+    const len = reasoningText(item).length;
+    const now = Date.now();
+    if (item !== _reasonItem || len < _reasonMax - 400) {
+      _reasonItem = item; _reasonMax = len; _reasonAt = now; return;
+    }
+    if (len > _reasonMax) { _reasonMax = len; _reasonAt = now; }
+  }
+  const reasoningGrewWithin = (ms) => _reasonMax > 1 && Date.now() - _reasonAt < ms;
+
   const WEDGE_MS = 10000;
   let _stopSince = 0;
   function genActive() {
     sampleStream();
+    sampleReasoning();
     const stop = !!stopButton();
     const now = Date.now();
     if (stop) {
       if (!_stopSince) _stopSince = now;
       // Trust the stop button while the stream advances, or just after it
       // appeared (generation spinning up). Frozen past WEDGE_MS ⇒ treat as done.
-      return (now - _streamAt < WEDGE_MS) || (now - _stopSince < 2000);
+      return (now - _streamAt < WEDGE_MS) ||
+        reasoningGrewWithin(WEDGE_MS) || (now - _stopSince < 2000);
     }
     _stopSince = 0;
     return grewWithin(timings.GEN_IDLE_MS);
@@ -636,7 +656,7 @@ const ZSProvider = (() => {
     if (relock) setEditable(true); // injection needs the composer to be editable
     try {
       await setEditorText(ed, text);
-      // Attach images LAST, right before the send click - see gemini.js/deepseek.js
+      // Attach images LAST, right before the send click - see gemini.js
       // typeAndSend for why (attaching first and then retyping the text can sever
       // the site's binding between the pending upload and the message sent).
       if (images && images.length) {
@@ -828,7 +848,7 @@ const ZSProvider = (() => {
         // This used to preventDefault + stopImmediatePropagation (ported from an
         // older, stricter pattern), which made a blank ChatGPT tab impossible to
         // type in until an agent was started - a regression against every other
-        // provider. Matches deepseek.js: "nudge only; never block plain chat".
+        // provider. Uses a nudge-only provider pattern; never block plain chat.
         if (!handlers.isStarted()) {
           if (!chatIsEmpty()) return; // existing conversation → not ours to gate
           handlers.onBlockedAttempt();
