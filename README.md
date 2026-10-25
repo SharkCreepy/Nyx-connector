@@ -1,4 +1,3 @@
-```markdown
 # Nyx V1 - Free AI Agent for Roblox Studio
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey)
@@ -9,9 +8,9 @@ Control Roblox Studio with AI directly from your browser - read/edit scripts, ru
 
 Maintained by [SharkCreepy](https://github.com/SharkCreepy).
 
-Nine AI providers are supported: **DeepSeek** (chat.deepseek.com, recommended), **ChatGPT** (chatgpt.com), **Claude** (claude.ai), **Google Gemini** (gemini.google.com), **Kimi** (kimi.ai, Moonshot AI), **GLM** (chat.z.ai, Z.ai), **Qwen** (chat.qwen.ai), **Arena** (arena.ai, a multi-model playground) and **Meta AI** (meta.ai). On ChatGPT and Claude, screenshots and image input are disabled in this integration. Gemini and Kimi can be unstable: Gemini tends to stop using the Roblox tools in long sessions, and Kimi sometimes uses its own native tools instead of the Roblox commands. On Arena, use **Direct** mode (Nyx V1 only supports Direct; it blocks Start in Battle / Side-by-Side / Agent modes). DeepSeek is the recommended provider.
+Nine AI providers are supported: **DeepSeek** (chat.deepseek.com, recommended), **ChatGPT** (chatgpt.com), **Claude** (claude.ai), **Google Gemini** (gemini.google.com), **Kimi** (kimi.ai, Moonshot), **GLM** (chat.z.ai), **Qwen** (chat.qwen.ai), **Arena** (arena.ai), and **Meta AI** (meta.ai).
 
-> *Also known as: Nyx V1 Roblox, Nyx V1 free download, Roblox ChatGPT agent, Roblox DeepSeek agent, Roblox Gemini agent, Roblox Kimi agent, Roblox GLM agent, Roblox Qwen agent, Roblox Arena agent, Roblox Meta AI agent, Roblox Studio AI automation, Luau AI, MCP Roblox, free Roblox AI agent, free Roblox Studio AI agent*
+> *Also known as: Nyx V1 Roblox, Nyx V1 free download, Roblox ChatGPT agent, Roblox DeepSeek agent, Roblox Gemini agent, Roblox Kimi agent, Roblox GLM agent, Roblox Qwen agent, Roblox Arena agent, Roblox Meta AI agent.*
 
 ## ⚠️ Nyx V1 is Free — Beware of Paid Copycats
 
@@ -27,7 +26,7 @@ AI chat (ChatGPT / DeepSeek / Gemini / Kimi / GLM / Qwen / Arena / Meta AI, in y
 
 ```
 
-The extension runs inside the chat page (ChatGPT, DeepSeek, Gemini, Kimi, GLM, Qwen, Arena or Meta AI). When you type a request, it sends commands to the Bridge running on your PC, which drives Roblox Studio through the built-in MCP server.
+The extension runs inside the chat page (ChatGPT, DeepSeek, Gemini, Kimi, GLM, Qwen, Arena or Meta AI). When you type a request, it sends commands to the Bridge running on your PC, which drives Roblox Studio through the local MCP bridge.
 
 ## Setup
 
@@ -56,21 +55,21 @@ Open Studio and load a Place, then enable MCP (first time only):
 ### 3. Run the Bridge
 
 - **Windows:** double-click `start.bat` inside the extracted folder.
-- **macOS:** double-click `MacOS_Start.command` inside the extracted folder. The first time, macOS will show a security warning ("could not verify... free of malware") - this is normal for any script downloaded outside the App Store, click **Done**, then go to **System Settings > Privacy & Security**, scroll to the bottom, and click **Open Anyway**. You only need to do this once.
+- **macOS:** double-click `MacOS_Start.command` inside the extracted folder. The first time, macOS will show a security warning ("could not verify... free of malware") - this is normal for any script downloaded outside the App Store.
 
 A small window opens, that means the Bridge is running.
 
 ### 4. Start a session
 
-Go to https://chat.deepseek.com (recommended), https://chatgpt.com, https://claude.ai, https://gemini.google.com, https://www.kimi.ai, https://chat.z.ai, https://chat.qwen.ai, https://arena.ai or https://www.meta.ai and open a new chat. The Nyx V1 bar appears above the input box. Click **Start session**. Type what you want to build.
+Go to https://chat.deepseek.com (recommended), https://chatgpt.com, https://claude.ai, https://gemini.google.com, https://www.kimi.ai, https://chat.z.ai, https://chat.qwen.ai, https://arena.ai or https://meta.ai.
 
-Use the MCP target dropdown in the chat bar to choose **Roblox Studio** or a configured server such as **VS Code** before starting a session. The provider dropdown opens the supported AI chat sites.
+Use the MCP target dropdown in the chat bar to choose **Roblox Studio** or a configured server such as **VS Code** before starting a session. The provider dropdown opens the supported AI chat site list.
 
 > Only works on chat.deepseek.com, chatgpt.com, claude.ai, gemini.google.com, kimi.ai, chat.z.ai, chat.qwen.ai, arena.ai and meta.ai - it will not work on any other site.
 >
 > On Arena, keep the mode dropdown on **Direct** - Nyx V1 blocks Start in Battle / Side-by-Side / Agent modes (it only drives a single Direct reply).
 >
-> Gemini and Kimi can be unstable (model behavior, not the extension): Gemini may stop using the Roblox tools after a while, and Kimi may use its own native tools instead. If the AI starts answering in plain text instead of acting, remind it to use the commands or start a new session.
+> Gemini and Kimi can be unstable (model behavior, not the extension): Gemini may stop using the Roblox tools after a while, and Kimi may use its own native tools instead. If the AI starts answering normally, restart the session.
 
 ## What the AI can do
 
@@ -84,7 +83,6 @@ Use the MCP target dropdown in the chat bar to choose **Roblox Studio** or a con
 
 ## Credits / License
 
-Nyx V1 is a rebranded/modified version of the snapgentV3 project. The original project and its authors retain their copyright. Rebranding and modifications by SharkCreepy.
+Nyx V1 is a rebranded/modified version of the original Snapgent project. The original project and its authors retain their copyright. Rebranding and modifications by SharkCreepy.
 
 Licensed under **GPL-3.0**.
-```
