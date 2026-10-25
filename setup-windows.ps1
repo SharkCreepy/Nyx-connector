@@ -42,4 +42,8 @@ if ($config.mcpServers.vscode) {
     Write-Host "  VS Code MCP: $($config.mcpServers.vscode.command)"
 }
 
-$config | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $configPath -Encoding UTF8
+$json = $config | ConvertTo-Json -Depth 10
+# Windows PowerShell 5.1's -Encoding UTF8 adds a BOM. The bundled bridge's
+# JSON reader rejects that prefix, so write explicit UTF-8 without a BOM.
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($configPath, $json, $utf8NoBom)
