@@ -1,12 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "snapgentV3 × Roblox Studio Agent",
-  "version": "1.5.5",
-  "description": "Turn ChatGPT, Claude, DeepSeek, Gemini, Kimi, GLM, Qwen, Arena or Meta AI into a Roblox Studio agent that drives Studio through a local bridge.",
+  "name": "Nyx V1",
+  "version": "1.0.0",
+  "description": "Turn ChatGPT, Claude, Gemini, Kimi, GLM, Qwen, Arena or Meta AI into a Roblox Studio agent that drives Studio through a local bridge.",
   "permissions": ["storage"],
   "host_permissions": [
-    "https://chat.deepseek.com/*",
-    "https://deepseek.com/*",
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
     "https://claude.ai/*",
@@ -25,26 +23,20 @@
     "service_worker": "background.js"
   },
   "icons": {
-    "16": "icon.png",
-    "48": "icon.png",
-    "128": "icon.png"
+    "16": "icon-512.png",
+    "48": "icon-512.png",
+    "128": "icon-512.png"
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "snapgentV3",
+    "default_title": "Nyx V1",
     "default_icon": {
-      "16": "icon.png",
-      "48": "icon.png",
-      "128": "icon.png"
+      "16": "icon-512.png",
+      "48": "icon-512.png",
+      "128": "icon-512.png"
     }
   },
   "content_scripts": [
-    {
-      "matches": ["https://chat.deepseek.com/*"],
-      "js": ["core/config.js", "core/parser.js", "providers/deepseek.js", "core/main.js"],
-      "css": ["overlay.css"],
-      "run_at": "document_idle"
-    },
     {
       "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
       "js": ["providers/chatgpt-cm.js"],
