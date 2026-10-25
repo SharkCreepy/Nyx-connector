@@ -290,9 +290,16 @@ function statusObj() {
 }
 
 function broadcastStatus() {
-  chrome.runtime.sendMessage(statusObj()).catch(() => {});
+  // Some Edge versions expose the callback form without returning a Promise.
+  // Use a callback and consume lastError so a status broadcast cannot crash the
+  // service worker before the extension UI has even loaded.
+  try {
+    chrome.runtime.sendMessage(statusObj(), () => { void chrome.runtime.lastError; });
+  } catch {}
   chrome.tabs.query({ url: PROVIDER_URLS }, (tabs) => {
-    for (const t of tabs) chrome.tabs.sendMessage(t.id, statusObj()).catch(() => {});
+    for (const t of tabs) {
+      try { chrome.tabs.sendMessage(t.id, statusObj(), () => { void chrome.runtime.lastError; }); } catch {}
+    }
   });
 }
 
