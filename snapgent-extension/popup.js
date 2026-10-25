@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 const SUPPORTED_HOSTS = [
-  "chat.deepseek.com", "deepseek.com", "chatgpt.com", "chat.openai.com", "claude.ai",
+  "chatgpt.com", "chat.openai.com", "claude.ai",
   "gemini.google.com", "www.kimi.ai", "kimi.ai",
   "chat.z.ai", "chat.qwen.ai", "arena.ai", "www.meta.ai", "meta.ai",
 ];
-const DEFAULT_AI_URL = "https://chat.deepseek.com/";
-
-
+const DEFAULT_AI_URL = "https://chatgpt.com/";
 
 function render(s) {
   const state = document.getElementById("state");
@@ -18,13 +16,17 @@ function render(s) {
   const studioOff = mcpOk && s.studio === false; // MCP up but no Studio attached
   const ok = mcpOk && !studioOff;
   const dot = document.getElementById("dot");
+  
   dot.className = "dot " + (!s.connected ? "bad" : ok ? "ok" : "warn");
+  
   state.textContent = s.connected
     ? (ok ? "Connected"
         : studioOff ? "No Studio"
         : "Open Studio")
     : "Bridge offline";
-  tools.textContent = s.connected ? `${s.tools || 0} tools` : "Run start.bat";
+    
+  tools.textContent = s.connected ? `${s.tools || 0} tools` : "Run bridge to start";
+  
   servers.textContent = s.connected
     ? list.map((x) => `${x.alive ? "●" : "○"} ${x.id} (${x.alive ? x.tools + " tools" : "down"})`).join("\n")
     : "";
@@ -37,6 +39,7 @@ function refresh() {
 document.getElementById("reconnect").addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "reconnect" }, () => setTimeout(refresh, 600));
 });
+
 document.getElementById("restart").addEventListener("click", (e) => {
   e.target.textContent = "Restarting…";
   chrome.runtime.sendMessage({ type: "restart_mcp" }, () => {
@@ -44,6 +47,7 @@ document.getElementById("restart").addEventListener("click", (e) => {
     setTimeout(refresh, 600);
   });
 });
+
 document.getElementById("settings").addEventListener("click", () => {
   // Tries the in-page panel on an already-open supported AI tab first, so
   // opening it doesn't require a conversation to already be started there.
@@ -62,5 +66,6 @@ document.getElementById("settings").addEventListener("click", () => {
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg && msg.type === "zs-status") render(msg);
 });
+
 refresh();
 setInterval(refresh, 2000);
