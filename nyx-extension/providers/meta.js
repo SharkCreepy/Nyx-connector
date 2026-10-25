@@ -549,6 +549,36 @@ const ZSProvider = (() => {
     el.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  // Meta has used two different React event paths for the composer send control.
+  // A plain HTMLElement.click() works on some builds but is ignored on others
+  // when the composer is backed by the hidden mirror textarea. Keep the normal
+  // click first, then use a real pointer sequence and Enter only if Meta has not
+  // acknowledged the submission; this avoids duplicate sends on the working UI.
+  function pointerActivate(button) {
+    try { button.focus(); } catch {}
+    try {
+      const init = { bubbles: true, cancelable: true, view: window, button: 0 };
+      if (typeof PointerEvent === "function") {
+        button.dispatchEvent(new PointerEvent("pointerdown", { ...init, pointerId: 1, pointerType: "mouse" }));
+        button.dispatchEvent(new PointerEvent("pointerup", { ...init, pointerId: 1, pointerType: "mouse" }));
+      }
+      button.dispatchEvent(new MouseEvent("mousedown", init));
+      button.dispatchEvent(new MouseEvent("mouseup", init));
+      button.dispatchEvent(new MouseEvent("click", init));
+    } catch {}
+  }
+
+  function pressEnter(editor) {
+    if (!editor) return;
+    try { editor.focus(); } catch {}
+    try {
+      const init = { key: "Enter", code: "Enter", keyCode: 13, which: 13,
+        bubbles: true, cancelable: true, view: window };
+      editor.dispatchEvent(new KeyboardEvent("keydown", init));
+      editor.dispatchEvent(new KeyboardEvent("keyup", init));
+    } catch {}
+  }
+
   async function typeAndSend(text, images) {
     // Images FIRST: staging swaps in the inline image; the mirror textarea still
     // drives the composed text alongside it. Idempotent across the core's up-to-4
@@ -576,20 +606,32 @@ const ZSProvider = (() => {
     // Meta may keep the mirror textarea's value after accepting a send. Treat a
     // new user turn or the stop button as acceptance too; do not click repeatedly,
     // since a delayed composer update could otherwise send the same prompt twice.
+    const accepted = () =>
+      (editorText().trim() === "" && !hasPendingAttachment()) ||
+      userCount() > usersBeforeSend ||
+      !!stopButton();
     try { sendButton().click(); } catch (error) {
       throw new Error(`Meta AI send button failed: ${String(error && error.message || error)}`);
     }
-    const sent = await waitFor(() =>
-      (editorText().trim() === "" && !hasPendingAttachment()) ||
-      userCount() > usersBeforeSend ||
-      !!stopButton(),
-    5000);
+    // Give Meta's normal React click a short chance to take effect. If the
+    // current build ignores programmatic click(), retry through its pointer and
+    // keyboard paths before declaring startup failed.
+    let sent = await waitFor(accepted, 1800);
+    if (!sent) {
+      pointerActivate(sendButton());
+      sent = await waitFor(accepted, 1200);
+    }
+    if (!sent) {
+      pressEnter(getEditor() || editor);
+      sent = await waitFor(accepted, 8000);
+    }
     if (sent) _attachedImages = null;
     diag("meta.tas.sent", {
       sent,
       editorLen: editorText().length,
       newUserTurn: userCount() > usersBeforeSend,
       generating: !!stopButton(),
+      fallback: !sent ? "none" : editorText().trim() === "" ? "clear" : stopButton() ? "stop" : "user-turn",
     });
     if (!sent) {
       const send = sendButton();
