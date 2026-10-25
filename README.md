@@ -80,7 +80,7 @@ Use the MCP target dropdown in the chat bar to choose **Roblox Studio** or a con
 
 ## Credits / License
 
-Nyx V1 is a rebranded/modified version of the snapgentV3 project. The original project and its authors retain their copyright. Rebranding and modifications by SharkCreepy.
+Nyx V1 is a rebranded/modified version of the nyx project. The original project and its authors retain their copyright. Rebranding and modifications by SharkCreepy.
 
 Licensed under **GPL-3.0**.
 ```
