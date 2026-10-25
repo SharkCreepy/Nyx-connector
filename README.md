@@ -38,7 +38,7 @@ To load the extension:
 - Go to `edge://extensions` (Edge) or `chrome://extensions` (Chrome)
 - Enable **Developer mode** (top right toggle)
 - Click **Load unpacked**
-- Select the `nyx-extension` folder from the extracted zip
+- Select the `Nyx-extension` folder from the extracted zip
 
 ### 2. Start Roblox Studio and enable MCP
 
@@ -80,7 +80,7 @@ Use the MCP target dropdown in the chat bar to choose **Roblox Studio** or a con
 
 ## Credits / License
 
-Nyx V1 is a rebranded/modified version of the nyx project. The original project and its authors retain their copyright. Rebranding and modifications by SharkCreepy.
+Nyx V1 is a rebranded/modified version of the Nyx project. The original project and its authors retain their copyright. Rebranding and modifications by SharkCreepy.
 
 Licensed under **GPL-3.0**.
 ```

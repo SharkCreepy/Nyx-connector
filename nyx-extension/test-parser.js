@@ -69,7 +69,7 @@ const cutEsc = ZSParse.salvageCutOff('{"command": "execute_luau", "params": {"co
 ok("salvage handles escaped quotes", cutEsc && cutEsc.tool === "execute_luau" && cutEsc.arguments.code === 'print("hi")');
 
 // ── DeepSeek's native DSML tool-call markup ────────────────────────────────
-// DeepSeek sometimes answers in its own agentic markup instead of a nyx
+// DeepSeek sometimes answers in its own agentic markup instead of a Nyx
 // command. It has no "command"/"tool" key and no ###...### markers, so the
 // classify ladder used to miss it entirely and the turn died as plain text.
 // DSML_RE is what fires the "dsml" parse_error that asks for a rewrite.
@@ -94,7 +94,7 @@ ok("dsml full-width bar", ZSParse.DSML_RE.test('<｜DSML｜>invoke name="script_
 ok("dsml doubled bars with spaces", ZSParse.DSML_RE.test('< |  | DSML |  | tool_calls>'));
 ok("dsml doubled-bar closer", ZSParse.DSML_RE.test('</ |  | DSML |  | parameter>'));
 ok("dsml closing tag alone", ZSParse.DSML_RE.test('</|DSML|>parameter>'));
-// DSML is NOT a nyx command shape: it must reach the fallthrough guards.
+// DSML is NOT a Nyx command shape: it must reach the fallthrough guards.
 ok("dsml is not a tool signature", !ZSParse.hasToolSignature(dsmlFull));
 // DSML must NOT be a tool signature (it has to fall through to the classify
 // ladder so the "dsml" parse_error fires) but it MUST be a command shape, so the
