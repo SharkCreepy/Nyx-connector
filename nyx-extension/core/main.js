@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // core/main.js - the provider-agnostic agentic loop, UI and session state.
 // Drives any AI chat site through the ZSProvider interface (providers/*.js):
-// waits for the model's reply, parses Nyx V1 commands (ZSParse), asks the
+// waits for the model's reply, parses snapgentV3 commands (ZSParse), asks the
 // background worker to execute them on the Roblox MCP bridge, and feeds the
 // result back. Camouflages the system prompt ("Starting Up") and tool JSON
 // behind animated chips, masks injected input, and exposes a Stop button.
@@ -16,7 +16,7 @@
   const P = ZSProvider;
   const T = P.timings;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const log = (...a) => console.log("[Nyx V1]", ...a);
+  const log = (...a) => console.log("[snapgentV3]", ...a);
 
   // ── Anti-bot mitigation (EXPERIMENTAL) ──────────────────────────────────
   // Suspected contributor to Arena's captcha: the agentic loop sends turns
@@ -28,8 +28,8 @@
   const HUMANIZE_SEND = false; // didn't prevent Arena's captcha (fires on turn 1 already) - revert
   const SEND_JITTER_MS = [400, 1400]; // [min, max] ms, randomized per send
   function jitterBeforeSend() {
-    if (!HUMANIZE_SEND) return Promise.resolve();
-    const [lo, hi] = SEND_JITTER_MS;
+    if (!HUMANIZE_SEND && P.id !== "deepseek") return Promise.resolve();
+    const [lo, hi] = P.id === "deepseek" ? [1500, 4000] : SEND_JITTER_MS;
     return sleep(lo + Math.random() * (hi - lo));
   }
 
@@ -79,10 +79,11 @@
   }
 
   // GitHub releases page - where users download the Bridge + start.bat.
-  const GITHUB_URL = "https://github.com/SharkCreepy/Nyx-connector";
-  // AI chat sites Nyx V1 works on. Keep in sync with manifest.json
+  const GITHUB_URL = "https://github.com/herdodp/snapgent-connector";
+  // AI chat sites snapgentV3 works on. Keep in sync with manifest.json
   // content_scripts and background.js PROVIDER_URLS when adding a provider.
   const AI_SITES = [
+    { name: "DeepSeek", url: "https://chat.deepseek.com/" },
     { name: "ChatGPT", url: "https://chatgpt.com/" },
     { name: "Claude", url: "https://claude.ai/new" },
     { name: "Gemini", url: "https://gemini.google.com/app" },
@@ -107,7 +108,7 @@
       }
     });
   } catch (error) {
-    console.warn("[Nyx V1] Could not load selected MCP target:", error);
+    console.warn("[snapgentV3] Could not load selected MCP target:", error);
   }
 
   const A = {
@@ -154,8 +155,8 @@
     toolArg: "",
     toolList: [],
     toolNames: new Set(),
-    // Successful tool calls since the last command-list reminder. 
-    // Others can drift away from the exact command names over a long session,
+    // Successful tool calls since the last command-list reminder. DeepSeek (and
+    // others) can drift away from the exact command names over a long session,
     // so we re-inject the list every REMIND_TOOLS_EVERY calls (see agentLoop).
     toolCallsSinceReminder: 0,
     // When the system prompt was last re-stated. Diagnostic only - whether one
@@ -622,7 +623,7 @@
       // mid-generation and nags a model that did nothing wrong. Only guard when
       // the reply already LOOKS like a command (so a plain-text answer is never
       // delayed) and bound it with UNSETTLED_GRACE_MS. No-op on providers that
-      // don't implement replyUnsettled (Gemini/GLM/Kimi/Arena).
+      // don't implement replyUnsettled (DeepSeek/Gemini/GLM/Kimi/Arena).
       const cmdShaped = P.replyUnsettled && (
         ZSParse.hasToolSignature(r) ||
         (ZSParse.LUA_END_RE.test(r) && !ZSParse.LUA_START_RE.test(r)) ||
@@ -688,7 +689,7 @@
         // command silently dropped and the loop finalized the turn as a plain-text
         // answer with no result and no error - a dead turn. Fire a parse_error so
         // the model can fix its JSON. GATED on a known command name so prose that
-        // merely quotes {"command":"..."} (a provider's explanation, or a
+        // merely quotes {"command":"..."} (a DeepSeek-style explanation, or a
         // placeholder like "command_name") is NOT misread as a broken command and
         // looped on - only a real tool name means a genuine failed call.
         const nm = ZSParse.toolNameFromText(r);
@@ -697,11 +698,15 @@
         }
       }
       // The model answered in its OWN native tool-call markup instead of a
-      // Nyx V1 command. It carries no "command"/"tool" key and no ###...### 
-      // markers, so hasToolSignature is false and every guard below misses it too: 
-      // the turn finalized as a plain-text answer, the tool never ran, and the loop 
-      // ended on a dead agent. Checked FIRST among the fallthrough guards because 
-      // the marker is unambiguous.
+      // snapgentV3 command - DeepSeek's DSML invoke/parameter tags (reported by
+      // users, 2026-08; DeepSeek is the only provider seen doing it). It carries
+      // no "command"/"tool" key and no ###...### markers, so hasToolSignature is
+      // false and every guard below misses it too: the turn finalized as a
+      // plain-text answer, the tool never ran, and the loop ended on a dead agent.
+      // Checked FIRST among the fallthrough guards because the marker is
+      // unambiguous - unlike the guards below it needs no known-tool gate, which
+      // matters because the degenerate form seen in the wild carries no tool name
+      // at all (a bare tool_calls opener followed by prose).
       if (ZSParse.DSML_RE.test(r)) {
         diag("cmd.dsml", { len: r.length });
         return { kind: "parse_error", reason: "dsml", raw: r, item: d.item };
@@ -728,8 +733,10 @@
       // yet hasToolSignature never fires (no "command" key, no markers) and the
       // argument keys are the tool's own, so neither guard above catches it: the
       // turn finalized as a plain-text answer and the loop ENDED with the user
-      // watching a dead agent. GATED on the value being a tool we actually have 
-      // - same reasoning as the toolNameFromText gate above.
+      // watching a dead agent (seen live on ChatGPT, long session, 2026-08).
+      // GATED on the value being a tool we actually have - same reasoning as the
+      // toolNameFromText gate above, so prose that merely mentions a tool name in
+      // some JSON example is never looped on.
       const wrongKey = /"(?:toolName|tool_name|tool|name|function|action)"\s*:\s*"([A-Za-z0-9_.\/-]+)"/.exec(r);
       if (wrongKey && !/"command"\s*:/.test(r)) {
         const wk = wrongKey[1];
@@ -769,8 +776,10 @@
   // problems with opposite fixes: a bridge outage is fixed by start.bat and
   // resolves itself, while this one can ONLY be fixed by reloading the page and
   // never recovers on its own. Lumping them together (the old behaviour) told
-  // the model "the local Nyx V1 bridge is unreachable", which sent the user
-  // to check a bridge that was perfectly healthy.
+  // the model "the local snapgentV3 bridge is unreachable", which sent the user
+  // to check a bridge that was perfectly healthy. Diagnosed 2026-08-14 by the
+  // giveaway timing: a genuine outage takes 8s (background.js `send` waits via
+  // waitForConnection first), an invalidated context comes back in ~1ms.
   //
   // Every user meets this eventually - Chrome auto-updates extensions under
   // open tabs - so it is worth its own message.
@@ -918,7 +927,7 @@
       }
       return `ERROR: the '${bareName}' command timed out and is unavailable in this environment. Do NOT call it again - complete the task yourself using the other commands (execute_luau, multi_edit, etc.).`;
     }
-    // Virtual command: list the MCP server(s) Nyx V1 is currently connected
+    // Virtual command: list the MCP server(s) snapgentV3 is currently connected
     // to, with each one's REAL per-server health (from the bridge, never the
     // merged tool count - a dead server must not borrow another's numbers).
     if (name === "list_mcp_servers") {
@@ -1075,7 +1084,7 @@
         return `ERROR: '${bareName}' returned an image, but this assistant cannot see images. Do NOT call it again. Use a different command to get the information as text instead.`;
       }
       if (r.images && r.images.length) {
-        // Show the capture in a left-hand Nyx V1 popup (from the in-memory
+        // Show the capture in a left-hand snapgentV3 popup (from the in-memory
         // base64 - simple and reliable on every site; no DOM-embedded preview).
         ui.showImages(r.images, name);
         // Do NOT attach the image here: submitAndGetBase/typeAndSend types the
@@ -1330,7 +1339,7 @@
             const detail = res.reason === "unclosed" ? "cut off"
               : res.reason === "luaOpener" ? "missing ###LUA###"
               : res.reason === "envelope" ? "bad format"
-              // DSML is not JSON at all - it is the provider's own markup - so the
+              // DSML is not JSON at all - it is DeepSeek's own markup - so the
               // default "bad JSON" would send the user (and anyone reading a bug
               // report) looking for a syntax slip that does not exist.
               : res.reason === "dsml" ? "wrong format"
@@ -1517,7 +1526,7 @@
   const assistantIdx = (item) => P.allItems().filter(P.isAssistantItem).indexOf(item);
   // Virtualization-stable map key for the off-DOM executed/halted memories.
   // assistantIdx is POSITIONAL within the currently-rendered window, so on a
-  // virtualized list (Qwen/GLM/Arena) scrolling up renders a different
+  // virtualized list (DeepSeek/Qwen/GLM/Arena) scrolling up renders a different
   // set of turns and an OLD command turn takes a low index that COLLIDES with a
   // current turn's key - the dedupe then misses and the watchdog re-fires the
   // scrolled-back tool. Prefer the provider's stable per-turn id when it exposes
@@ -1781,10 +1790,10 @@
     const rider =
       "\n\n────────────────────────────────\n" +
       ZS.RESEND_MARKER + "\n" +
-      "(System note from Nyx V1 - an automatic re-statement of your operating " +
+      "(System note from snapgentV3 - an automatic re-statement of your operating " +
       "instructions, NOT a new request and NOT something to reply to. This conversation " +
       "may have been summarised, which drops the part explaining how you actually run " +
-      "commands. To be explicit: the Nyx V1 extension IS running in this page right " +
+      "commands. To be explicit: the snapgentV3 extension IS running in this page right " +
       "now, it DOES read your replies, and the commands below DO execute for real - the " +
       "results you have been receiving are proof of it. Keep using them exactly as " +
       "described. Just carry on with the task; do not acknowledge this note.)\n" +
@@ -2197,7 +2206,7 @@
       }
 
       // 3. Assistant command turns → live loading while streaming, ✓ when done.
-      // ONLY in a real Nyx V1 session (started or bootstrapping). Without
+      // ONLY in a real snapgentV3 session (started or bootstrapping). Without
       // this gate, a plain never-started chat where the model merely EXPLAINS
       // the command format (a {"command":...} example in its answer) got the
       // example MASKED behind a tool chip - hiding genuine content the user
@@ -2590,7 +2599,7 @@
         try {
           chrome.storage.local.set({ [TARGET_STORAGE_KEY]: selectedTargetId });
         } catch (error) {
-          console.error("[Nyx V1] Could not save selected MCP target:", error);
+          console.error("[snapgentV3] Could not save selected MCP target:", error);
         }
         lastBarSig = "";
         renderBar();
@@ -2822,7 +2831,7 @@
         mcpList += `<div class="zs-mcp-item"><span class="zs-mcp-health zs-mcp-health-${healthClass}" title="${healthTitle}"></span><div class="zs-mcp-info"><span class="zs-mcp-name">${esc(s.name)}</span><span class="zs-mcp-url">${esc(s.command || s.id)}</span></div><button class="zs-mcp-remove" data-id="${esc(s.id)}" title="Remove">✕</button></div>`;
       });
       menuEl.innerHTML =
-        `<div class="zs-menu-head"><span class="zs-menu-logo">Nyx V1</span></div>
+        `<div class="zs-menu-head"><span class="zs-menu-logo">snapgentV3</span></div>
          <section class="zs-menu-sec">
            <div class="zs-sec-label"><span>Switch AI</span></div>
            ${sites}
@@ -2930,7 +2939,7 @@
       setupCard.id = "zs-setup";
       setupCard.hidden = true;
       setupCard.innerHTML =
-        `<div id="zs-setup-head"><span id="zs-setup-logo">Nyx V1</span><span id="zs-setup-tag">Setup</span></div>` +
+        `<div id="zs-setup-head"><span id="zs-setup-logo">snapgentV3</span><span id="zs-setup-tag">Setup</span></div>` +
         `<div id="zs-setup-sub">3 quick steps.</div>` +
         `<ol id="zs-setup-steps">` +
           `<li>Open <b>Settings</b></li>` +
@@ -2982,7 +2991,7 @@
     function refreshSetup(bridgeConnected) {
       if (setupSeen || bridgeConnected) { hideSetup(); return; }
       // Bridge is down, but if the user is just READING an existing
-      // conversation with no Nyx V1 session (the "No agent here" state),
+      // conversation with no snapgentV3 session (the "No agent here" state),
       // a "bridge down" onboarding popup is pure noise - they may not want an
       // agent here at all (user request). Keep it for the states where the
       // bridge actually matters: a fresh/empty chat (the Start affordance is
@@ -3213,7 +3222,7 @@
         refreshSetup(s.connected);
         return;
       }
-      // Nyx V1 status tracks ONLY the primary Roblox MCP server. Every other
+      // snapgentV3 status tracks ONLY the primary Roblox MCP server. Every other
       // server is an addon and must NEVER make the status/gate look connected while
       // Roblox itself is down. Old bridges don't send per-server health, so fall
       // back to the aggregate signals they do send (mcpAlive / total tools).
@@ -3299,7 +3308,7 @@
       const b = document.createElement("div");
       b.className = "zs-banner limit zs-stale";
       b.innerHTML = `<div class="zs-banner-t">⚠ Reload page</div>
-        <div class="zs-banner-m">Nyx V1 was updated. Reload this page to continue.</div>
+        <div class="zs-banner-m">snapgentV3 was updated. Reload this page to continue.</div>
         <div class="zs-banner-acts"><button class="zs-banner-reload">Reload page</button></div>`;
       b.querySelector(".zs-banner-reload").addEventListener("click", () => location.reload());
       root.appendChild(b);
@@ -3315,7 +3324,7 @@
       if (bridgeBannerEl) return; // already shown
       const b = document.createElement("div");
       b.className = "zs-banner limit";
-      b.innerHTML = `<div class="zs-banner-t">⚠ Nyx V1 disconnected</div>
+      b.innerHTML = `<div class="zs-banner-t">⚠ snapgentV3 disconnected</div>
         <div class="zs-banner-m">Bridge stopped. Run start.bat and keep Roblox Studio open.</div>
         <div class="zs-banner-acts"><button class="zs-banner-x">Close</button></div>`;
       b.querySelector(".zs-banner-x").addEventListener("click", () => { b.remove(); if (bridgeBannerEl === b) bridgeBannerEl = null; });
@@ -3804,7 +3813,7 @@
       root.appendChild(b);
     }
 
-    // Left-hand Nyx V1 popup showing the latest screen_capture. Fed from the
+    // Left-hand snapgentV3 popup showing the latest screen_capture. Fed from the
     // in-memory base64 (a data: URL always renders), so it works identically on
     // every provider and never touches the site's DOM. Only the most recent
     // capture is kept - a new one replaces the old.
@@ -3882,7 +3891,7 @@
   }
 
   // Timestamp of the user's last REAL click on the site (trusted event, outside
-  // Nyx V1's own UI). A genuine "regenerate ↻" is always such a click;
+  // snapgentV3's own UI). A genuine "regenerate ↻" is always such a click;
   // DeepSeek's post-stop phantom generations and stop-button re-mount flickers
   // never are - this is what tells them apart (seen live: two false regenResume
   // fired 8s/2s after a Stop with no user action, un-stopping the halted turn).
@@ -4013,7 +4022,7 @@
     // - stopLoop both halts our loop AND clicks the site's native stop - and the
     // site's native stop likewise halts our loop via onNativeStop, so either one
     // fully stops everything. Two stop buttons at once is fine.
-    // The bare isHardGenerating() term is gated on a live Nyx V1 session: on
+    // The bare isHardGenerating() term is gated on a live snapgentV3 session: on
     // a plain chat with no session, a user's own message makes the site generate,
     // and we must NOT briefly flash our Stop button over that.
     // Self-heal a stuck "Stopping…": if we flagged stopping but nothing is
@@ -4146,9 +4155,9 @@
       }
     });
   } catch {}
-  // A conversation IS a Nyx V1 session if any rendered turn carries a
+  // A conversation IS a snapgentV3 session if any rendered turn carries a
   // telltale artefact: the system-prompt marker, an injected tool-result /
-  // system-note turn, or a Nyx V1 command an assistant wrote. Works even
+  // system-note turn, or a snapgentV3 command an assistant wrote. Works even
   // after a full cold start and regardless of scroll position.
   function domHasZsSignal() {
     for (const it of P.allItems()) {
@@ -4198,7 +4207,7 @@
       }
     }
     // Same idea for a RUNNING loop: if the user opens a NEW, empty conversation
-    // via the SITE's own new-chat (not Nyx V1's button), the loop is bound to
+    // via the SITE's own new-chat (not snapgentV3's button), the loop is bound to
     // a chat the user left, so abandon it. Otherwise A.running keeps this function
     // early-returning below and the stale "Agent active" / Stop button lingers on
     // the fresh chat instead of "Start Roblox agent". The "/app" → "/app/<id>" id
@@ -4392,7 +4401,7 @@
     // RENDERED turn; scrolling up makes it an old command whose id is below the
     // session's high-water mark. Its result row may be off-screen (unrendered), so
     // the result-below guard alone can miss it - this catches it directly. Only
-    // applies when the provider exposes a numeric monotonic id.
+    // applies when the provider exposes a numeric monotonic id (DeepSeek).
     const curId = P.itemKey ? Number(P.itemKey(item)) : NaN;
     if (Number.isFinite(curId) && A.maxTurnId != null && curId < A.maxTurnId) {
       // Log once per distinct turn, not every 1s tick while the user stays up.
@@ -4443,7 +4452,7 @@
   // produced. So when a re-statement has been owed for a while and nothing has
   // carried it, send it as its own turn: masked exactly like the bootstrap (the
   // SYS_MARKER makes the camouflage sweep hide the whole item), so the user sees
-  // nothing but the model's short acknowledgement.
+  // nothing but ChatGPT's short acknowledgement.
   //
   // This costs one message from the site's quota, which is why it is a fallback
   // and not the primary path. Deliberately conservative about WHEN it may fire:
@@ -4473,5 +4482,5 @@
     }
   }, 5000);
 
-  log(`Nyx V1 content script ready (provider: ${P.id})`);
+  log(`snapgentV3 content script ready (provider: ${P.id})`);
 })();
